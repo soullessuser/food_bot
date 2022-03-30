@@ -34,9 +34,9 @@ class Food(BaseModel):
     category = ForeignKeyField(FoodCategory)
     weight = IntegerField()
 
-    proteins = IntegerField(null=True)
-    fats = IntegerField(null=True)
-    carbohydrates = IntegerField(null=True)
+    proteins = IntegerField(null=True, default=0)
+    fats = IntegerField(null=True, default=0)
+    carbohydrates = IntegerField(null=True, default=0)
 
 
 def add_user_to_db(text):
@@ -72,6 +72,10 @@ def user_calories(user):
         return user.calories
     except:
         return 0
+
+
+def get_user(text):
+    return add_user_to_db(text)
 
 
 def add_food_cathegory_to_db(text):
@@ -110,13 +114,16 @@ def add_carbohydrates_to_user(user, carbohydrates):
     user.save()
 
 
-def add_food_for_user(user, category, name, calories, weight):
+def add_food_for_user(user, category, name, calories, weight, proteins, fats, carbohydrates):
     food = Food(
         user=user,
         category=category,
         name=name,
         calories=float(calories),
         weight=int(weight),
+        proteins=int(proteins),
+        fats=int(fats),
+        carbohydrates=int(carbohydrates),
         date=datetime.now().date(),
         time=datetime.now().time()
     )
@@ -155,6 +162,51 @@ def get_cal_by_user(chat, date=None):
 
         user = User.select().where(User.chat_id == chat).get()
         cal = user.food.select(fn.SUM(Food.calories)).where(Food.date == date).scalar()
+
+        return cal
+    except:
+        return 0
+
+
+def get_prot_by_user(chat, date=None):
+    try:
+        if date:
+            date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            date = datetime.now().date()
+
+        user = User.select().where(User.chat_id == chat).get()
+        prot = user.food.select(fn.SUM(Food.proteins)).where(Food.date == date).scalar()
+
+        return prot
+    except:
+        return 0
+
+
+def get_fats_by_user(chat, date=None):
+    try:
+        if date:
+            date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            date = datetime.now().date()
+
+        user = User.select().where(User.chat_id == chat).get()
+        fats = user.food.select(fn.SUM(Food.fats)).where(Food.date == date).scalar()
+
+        return fats
+    except:
+        return 0
+
+
+def get_carb_by_user(chat, date=None):
+    try:
+        if date:
+            date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            date = datetime.now().date()
+
+        user = User.select().where(User.chat_id == chat).get()
+        cal = user.food.select(fn.SUM(Food.carbohydrates)).where(Food.date == date).scalar()
 
         return cal
     except:
