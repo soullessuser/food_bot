@@ -14,7 +14,7 @@ class BaseModel(Model):
 
 class User(BaseModel):
     chat_id = TextField()
-    calories = IntegerField(default=0)
+    calories = FloatField(default=0)
     proteins = IntegerField(default=0)
     fats = IntegerField(default=0)
     carbohydrates = IntegerField(default=0)
@@ -30,7 +30,7 @@ class Food(BaseModel):
     name = TextField()
     date = DateField()
     time = TimeField()
-    calories = IntegerField()
+    calories = FloatField()
     category = ForeignKeyField(FoodCategory)
     weight = IntegerField()
 
@@ -85,6 +85,7 @@ def add_food_cathegory_to_db(text):
         cat.save()
         return cat
 
+
 def add_calories_to_user(user, cal):
     user = User.select().where(User.chat_id == user).get()
     user.calories = cal
@@ -114,7 +115,7 @@ def add_food_for_user(user, category, name, calories, weight):
         user=user,
         category=category,
         name=name,
-        calories=int(calories),
+        calories=float(calories),
         weight=int(weight),
         date=datetime.now().date(),
         time=datetime.now().time()

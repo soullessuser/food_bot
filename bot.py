@@ -148,12 +148,14 @@ async def food_w(message: types.Message):
     await state.set_state(States.all()[8])
 
 
-@dp.message_handler(state=States.STATE_8, content_types=ContentType.TEXT)
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
+                    state=States.STATE_8, content_types=ContentType.TEXT)
 async def food_c(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    await state.update_data(calories=message.text)
+    message_text = message.text.replace(',', '.')
+    await state.update_data(calories=message_text)
     food_data = await state.get_data()
-    await bot.edit_message_text(message.text + ' ккал', food_data.get('last_message').chat.id,
+    await bot.edit_message_text(message_text + ' ккал', food_data.get('last_message').chat.id,
                                 food_data.get('last_message').message_id)
     food_for_user(message.from_user.id, food_data.get('category'), food_data.get('name'), food_data.get('calories'),
                   food_data.get('weight'))
@@ -174,7 +176,7 @@ async def today_food(message: types.Message):
 
     message_str += '\n*Приемы пищи за день:*\n'
     for i in food:
-        message_str += '*{}*\n{} ({}гр., {}ккал)\n\n'.format(i.category.name, i.name, i.weight, i.calories)
+        message_str += '*{}* ({})\n{} ({}гр., {}ккал)\n\n'.format(i.category.name, i.time[0:5], i.name, i.weight, i.calories)
 
     await message.answer(message_str, parse_mode='Markdown')
     await state.set_state(States.all()[1])
@@ -192,14 +194,15 @@ async def food_for_date(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
     food = food_by_user(message.from_user.id, message.text)
     cal = cal_by_user(message.from_user.id, message.text)
-    message_str = ''
+
     if food.exists():
         user_cals = get_user_calories(message.from_user.id)
         message_str = '*Съедено каллорий:* {}\n*Осталось каллорий:* {}\n'.format(cal, user_cals - cal)
 
         message_str += '\n*Приемы пищи за день:*\n'
         for i in food:
-            message_str += '*{}*\n{} ({}гр., {}ккал)\n\n'.format(i.category.name, i.name, i.weight, i.calories)
+            message_str += '*{}* ({})\n{} ({}гр., {}ккал)\n\n'.format(i.category.name, i.time[0:5], i.name, i.weight,
+                                                                      i.calories)
     else:
         message_str = 'На выбранную дату не найдено информации'
     await message.answer(message_str, parse_mode='Markdown')
@@ -208,7 +211,6 @@ async def food_for_date(message: types.Message):
 
 @dp.message_handler(state='*', commands=['my_limit'])
 async def my_limit(message: types.Message):
-
     await message.answer('*Лимит*: {}'.format(get_user_calories(message.from_user.id)), parse_mode='Markdown')
 
 
