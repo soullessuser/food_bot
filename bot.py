@@ -7,7 +7,7 @@ from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarku
 from db import init_db
 from utils import States, add_user, add_calories, add_proteins, add_fats, add_carbohydrates, food_for_user, \
     food_cathegory_name, is_user_not_empty, food_by_user, cal_by_user, get_user_calories, \
-    get_user_from_db, prot_by_user, fats_by_user, carb_by_user
+    get_user_from_db, prot_by_user, fats_by_user, carb_by_user, clear_food_from_db
 from messages import MESSAGES
 from conf import BOT_TOKEN
 
@@ -162,13 +162,14 @@ async def add_food_cal_state(message: types.Message):
     await state.set_state(States.FOOD_PROT)
 
 
-@dp.message_handler(lambda message: message.text.isdigit(),
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_PROT, content_types=ContentType.TEXT)
 async def add_food_prot_state(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    await state.update_data(calories=message.text)
+    message_text = message.text.replace(',', '.')
+    await state.update_data(calories=message_text)
     data = await state.get_data()
-    await bot.edit_message_text(message.text + ' ккал', data.get('last_message').chat.id,
+    await bot.edit_message_text(message_text + ' ккал', data.get('last_message').chat.id,
                                 data.get('last_message').message_id)
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько белков в порции:', reply_markup=cancel_kb)
@@ -176,13 +177,14 @@ async def add_food_prot_state(message: types.Message):
     await state.set_state(States.FOOD_FATS)
 
 
-@dp.message_handler(lambda message: message.text.isdigit(),
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_FATS, content_types=ContentType.TEXT)
 async def add_food_fats_state(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    await state.update_data(proteins=message.text)
+    message_text = message.text.replace(',', '.')
+    await state.update_data(proteins=message_text)
     data = await state.get_data()
-    await bot.edit_message_text(message.text + ' белки', data.get('last_message').chat.id,
+    await bot.edit_message_text(message_text + ' белки', data.get('last_message').chat.id,
                                 data.get('last_message').message_id)
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько жиров в порции:', reply_markup=cancel_kb)
@@ -190,13 +192,14 @@ async def add_food_fats_state(message: types.Message):
     await state.set_state(States.FOOD_CARB)
 
 
-@dp.message_handler(lambda message: message.text.isdigit(),
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_CARB, content_types=ContentType.TEXT)
 async def add_food_carb_state(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    await state.update_data(fats=message.text)
+    message_text = message.text.replace(',', '.')
+    await state.update_data(fats=message_text)
     data = await state.get_data()
-    await bot.edit_message_text(message.text + ' жиры', data.get('last_message').chat.id,
+    await bot.edit_message_text(message_text + ' жиры', data.get('last_message').chat.id,
                                 data.get('last_message').message_id)
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько углеводов в порции:', reply_markup=cancel_kb)
@@ -253,10 +256,10 @@ async def today_food_state(message: types.Message):
                 i.carbohydrates
             )
 
-        message_str += 'Калорий (съедено/осталось): {}/{}\n'.format(cal, user.calories - cal)
-        message_str += 'Белки: {}/{}\n'.format(prot, user.proteins - prot)
-        message_str += 'Жиры: {}/{}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {}/{}\n'.format(carb, user.carbohydrates - carb)
+        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(cal, user.calories - cal)
+        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(prot, user.proteins - prot)
+        message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
+        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carb, user.carbohydrates - carb)
     else:
         message_str = 'Не найдено информации'
 
@@ -307,10 +310,10 @@ async def food_for_date_state(message: types.Message):
                 i.carbohydrates
             )
 
-        message_str += 'Калорий (съедено/осталось): {}/{}\n'.format(cal, user.calories - cal)
-        message_str += 'Белки: {}/{}\n'.format(prot, user.proteins - prot)
-        message_str += 'Жиры: {}/{}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {}/{}\n'.format(carb, user.carbohydrates - carb)
+        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(cal, user.calories - cal)
+        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(prot, user.proteins - prot)
+        message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
+        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carb, user.carbohydrates - carb)
     else:
         message_str = 'Не найдено информации'
 
@@ -328,6 +331,11 @@ async def my_limit(message: types.Message):
     msg += 'углеводы: {}\n'.format(user.carbohydrates)
 
     await message.answer(msg, parse_mode='Markdown')
+
+
+@dp.message_handler(state='*', commands=['clear'])
+async def clear(message: types.Message):
+    await message.answer(clear_food_from_db(message.from_user.id), parse_mode='Markdown')
 
 
 async def shutdown(dispatcher: Dispatcher):

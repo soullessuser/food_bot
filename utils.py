@@ -3,7 +3,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from db import add_user_to_db, add_calories_to_user, add_proteins_to_user, add_fats_to_user, add_carbohydrates_to_user, \
     add_food_for_user, add_food_cathegory_to_db, get_food_cathegory, user_not_empty, get_food_by_user, get_cal_by_user, \
-    user_calories, get_user, get_prot_by_user, get_fats_by_user, get_carb_by_user
+    user_calories, get_user, get_prot_by_user, get_fats_by_user, get_carb_by_user, delete_food
 
 
 class States(StatesGroup):
@@ -144,5 +144,13 @@ def carb_by_user(chat, date=None):
     try:
         cal = get_carb_by_user(chat, date)
         return cal
+    except Exception as e:
+        return 'Ошибка: {}'.format(e)
+
+
+def clear_food_from_db(user):
+    try:
+        delete_food(user)
+        return 'Таблица очищена'
     except Exception as e:
         return 'Ошибка: {}'.format(e)

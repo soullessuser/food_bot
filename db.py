@@ -15,9 +15,9 @@ class BaseModel(Model):
 class User(BaseModel):
     chat_id = TextField()
     calories = FloatField(default=0)
-    proteins = IntegerField(default=0)
-    fats = IntegerField(default=0)
-    carbohydrates = IntegerField(default=0)
+    proteins = FloatField(default=0)
+    fats = FloatField(default=0)
+    carbohydrates = FloatField(default=0)
     age = IntegerField(default=0)
 
 
@@ -34,9 +34,9 @@ class Food(BaseModel):
     category = ForeignKeyField(FoodCategory)
     weight = IntegerField()
 
-    proteins = IntegerField(null=True, default=0)
-    fats = IntegerField(null=True, default=0)
-    carbohydrates = IntegerField(null=True, default=0)
+    proteins = FloatField(null=True, default=0)
+    fats = FloatField(null=True, default=0)
+    carbohydrates = FloatField(null=True, default=0)
 
 
 def add_user_to_db(text):
@@ -121,9 +121,9 @@ def add_food_for_user(user, category, name, calories, weight, proteins, fats, ca
         name=name,
         calories=float(calories),
         weight=int(weight),
-        proteins=int(proteins),
-        fats=int(fats),
-        carbohydrates=int(carbohydrates),
+        proteins=float(proteins),
+        fats=float(fats),
+        carbohydrates=float(carbohydrates),
         date=datetime.now().date(),
         time=datetime.now().time()
     )
@@ -211,6 +211,11 @@ def get_carb_by_user(chat, date=None):
         return cal
     except:
         return 0
+
+
+def delete_food(user):
+    user = User.select().where(User.chat_id == user).get()
+    Food.delete().where(Food.user == user, Food.date == datetime.now().date()).execute()
 
 
 def init_db():
