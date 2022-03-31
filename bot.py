@@ -2,7 +2,11 @@
 import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.dispatcher.filters import Text
+from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Message, \
+    CallbackQuery
+from aiogram_calendar import SimpleCalendar, simple_cal_callback
+
 
 from db import init_db
 from utils import States, add_user, add_calories, add_proteins, add_fats, add_carbohydrates, food_for_user, \
@@ -30,6 +34,9 @@ inline_btn_6 = InlineKeyboardButton('Добавить граммы, каллор
 
 inline_kb2 = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_5, inline_btn_6, inline_btn_cancel)
 cancel_kb = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_cancel)
+
+start_kb = ReplyKeyboardMarkup(resize_keyboard=True,)
+start_kb.row('Открыть календарь')
 
 
 @dp.message_handler(state='*', commands=['start'])
@@ -236,7 +243,7 @@ async def today_food_state(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
     food = food_by_user(message.from_user.id)
 
-    if food.exists():
+    if food and food.exists():
         user = get_user_from_db(message.from_user.id)
         cal = cal_by_user(message.from_user.id)
         prot = prot_by_user(message.from_user.id)
@@ -269,33 +276,41 @@ async def today_food_state(message: types.Message):
 
 @dp.message_handler(state='*', commands=['food_for_date'])
 async def food_for_date_input(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    await message.answer('Введи дату в формате: 2022-03-30', reply_markup=cancel_kb)
-    await state.set_state(States.FOOD_DATE)
+    await message.answer('Выбери дату в календаре', reply_markup=start_kb)
 
 
+@dp.message_handler(Text(equals=['Открыть календарь'], ignore_case=True))
+async def nav_cal_handler(message: Message):
+    await message.answer("Выбери дату: ", reply_markup=await SimpleCalendar().start_calendar())
+
+
+@dp.callback_query_handler(simple_cal_callback.filter())
+async def process_simple_calendar(callback_query: CallbackQuery, callback_data: CallbackQuery()):
+    selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
+    if selected:
+        await callback_query.message.answer(
+            f'{date.strftime("%Y-%m-%d")}',
+            reply_markup=None
+        )
+        state = dp.current_state(user=callback_query.message.from_user.id)
+        await state.set_state(States.FOOD_DATE)
+        callback_query.message.text = date.strftime("%Y-%m-%d")
+        await food_for_date_state(callback_query.message)
+
+
+@dp.callback_query_handler(simple_cal_callback.filter())
 @dp.message_handler(state=States.FOOD_DATE, content_types=ContentType.TEXT)
 async def food_for_date_state(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    food = food_by_user(message.from_user.id, message.text)
+    user = message.chat.id
+    food = food_by_user(message.chat.id, message.text)
 
-    # if food.exists():
-    #     user_cals = get_user_calories(message.from_user.id)
-    #     message_str = '*Съедено каллорий:* {}\n*Осталось каллорий:* {}\n'.format(cal, user_cals - cal)
-    #
-    #     message_str += '\n*Приемы пищи за день:*\n'
-    #     for i in food:
-    #         message_str += '*{}* ({})\n{} ({}гр., {}ккал)\n\n'.format(i.category.name, i.time.strftime("%H:%M"), i.name, i.weight,
-    #                                                                   i.calories)
-    # else:
-    #     message_str = 'На выбранную дату не найдено информации'
-
-    if food.exists():
-        user = get_user_from_db(message.from_user.id)
-        cal = cal_by_user(message.from_user.id, message.text)
-        prot = prot_by_user(message.from_user.id, message.text)
-        fats = fats_by_user(message.from_user.id, message.text)
-        carb = carb_by_user(message.from_user.id, message.text)
+    if food and food.exists():
+        user = get_user_from_db(user)
+        cal = cal_by_user(user, message.text)
+        prot = prot_by_user(user, message.text)
+        fats = fats_by_user(user, message.text)
+        carb = carb_by_user(user, message.text)
 
         message_str = ''
         for i in food:
@@ -317,7 +332,7 @@ async def food_for_date_state(message: types.Message):
     else:
         message_str = 'Не найдено информации'
 
-    await message.answer(message_str, parse_mode='Markdown')
+    await message.answer(message_str, parse_mode='Markdown', reply_markup=None)
     await state.set_state(States.WAIT)
 
 
