@@ -5,12 +5,12 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters import Text
 from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Message, \
     CallbackQuery
-from aiogram_calendar import SimpleCalendar, simple_cal_callback
+from aiogram_calendar import simple_cal_callback, SimpleCalendar
 
 
 from db import init_db
 from utils import States, add_user, add_calories, add_proteins, add_fats, add_carbohydrates, food_for_user, \
-    food_cathegory_name, is_user_not_empty, food_by_user, cal_by_user, get_user_calories, \
+    food_cathegory_name, is_user_not_empty, food_by_user, cal_by_user, \
     get_user_from_db, prot_by_user, fats_by_user, carb_by_user, clear_food_from_db
 from messages import MESSAGES
 from conf import BOT_TOKEN
@@ -36,7 +36,7 @@ inline_kb2 = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_5, inline
 cancel_kb = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_cancel)
 
 start_kb = ReplyKeyboardMarkup(resize_keyboard=True,)
-start_kb.row('Открыть календарь')
+start_kb.row('Календарь')
 
 
 @dp.message_handler(state='*', commands=['start'])
@@ -279,7 +279,7 @@ async def food_for_date_input(message: types.Message):
     await message.answer('Выбери дату в календаре', reply_markup=start_kb)
 
 
-@dp.message_handler(Text(equals=['Открыть календарь'], ignore_case=True))
+@dp.message_handler(Text(equals=['Календарь']), state='*')
 async def nav_cal_handler(message: Message):
     await message.answer("Выбери дату: ", reply_markup=await SimpleCalendar().start_calendar())
 
@@ -290,7 +290,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
     if selected:
         await callback_query.message.answer(
             f'{date.strftime("%Y-%m-%d")}',
-            reply_markup=None
+            reply_markup=start_kb
         )
         state = dp.current_state(user=callback_query.message.from_user.id)
         await bot.edit_message_text('Вы выбрали:', callback_query.message.chat.id, callback_query.message.message_id)
