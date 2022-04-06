@@ -276,12 +276,17 @@ async def today_food_state(message: types.Message):
 
 @dp.message_handler(state='*', commands=['food_for_date'])
 async def food_for_date_input(message: types.Message):
-    await message.answer('Выбери дату в календаре', reply_markup=start_kb)
+    state = dp.current_state(user=message.from_user.id)
+    message = await message.answer('Выбери дату в календаре', reply_markup=start_kb)
+    await state.update_data(calendar=message)
 
 
 @dp.message_handler(Text(equals=['Календарь']), state='*')
 async def nav_cal_handler(message: Message):
     await message.answer("Выбери дату: ", reply_markup=await SimpleCalendar().start_calendar())
+    state = dp.current_state(user=message.from_user.id)
+    data = await state.get_data()
+    await bot.delete_message(data.get('calendar').chat.id, data.get('calendar').message_id)
 
 
 @dp.callback_query_handler(simple_cal_callback.filter(), state='*')
@@ -289,8 +294,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
     selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
     if selected:
         await callback_query.message.answer(
-            f'{date.strftime("%Y-%m-%d")}',
-            reply_markup=start_kb
+            f'{date.strftime("%Y-%m-%d")}'
         )
         state = dp.current_state(user=callback_query.message.from_user.id)
         await bot.edit_message_text('Вы выбрали:', callback_query.message.chat.id, callback_query.message.message_id)

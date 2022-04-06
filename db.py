@@ -114,7 +114,8 @@ def add_carbohydrates_to_user(user, carbohydrates):
     user.save()
 
 
-def add_food_for_user(user, category, name, calories, weight, proteins, fats, carbohydrates):
+def add_food_for_user(user, category, name, calories, weight, proteins, fats, carbohydrates,
+                      date=datetime.now().date()):
     food = Food(
         user=user,
         category=category,
@@ -124,7 +125,7 @@ def add_food_for_user(user, category, name, calories, weight, proteins, fats, ca
         proteins=float(proteins),
         fats=float(fats),
         carbohydrates=float(carbohydrates),
-        date=datetime.now().date(),
+        date=date,
         time=datetime.now().time()
     )
     food.save()
