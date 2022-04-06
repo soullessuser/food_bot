@@ -284,7 +284,7 @@ async def nav_cal_handler(message: Message):
     await message.answer("Выбери дату: ", reply_markup=await SimpleCalendar().start_calendar())
 
 
-@dp.callback_query_handler(simple_cal_callback.filter())
+@dp.callback_query_handler(simple_cal_callback.filter(), state='*')
 async def process_simple_calendar(callback_query: CallbackQuery, callback_data: CallbackQuery()):
     selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
     if selected:
