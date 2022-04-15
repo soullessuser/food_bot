@@ -1,4 +1,5 @@
 #!venv/bin/python
+import asyncio
 import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -18,7 +19,6 @@ from conf import BOT_TOKEN
 # BOT
 bot = Bot(token=BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MemoryStorage())
-init_db()
 logging.basicConfig(level=logging.INFO)
 
 
@@ -363,5 +363,11 @@ async def shutdown(dispatcher: Dispatcher):
     await dispatcher.storage.wait_closed()
 
 
+def start():
+    init_db()
+
+
 def start_polling():
-    executor.start_polling(dp, on_shutdown=shutdown)
+    loop = asyncio.get_event_loop()
+    loop.create_task(init_db())
+    executor.start_polling(dp, on_shutdown=shutdown, skip_updates=True)
