@@ -1,24 +1,29 @@
 #!venv/bin/python
+import asyncio
 import logging
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Message, \
     CallbackQuery
 from aiogram_calendar import simple_cal_callback, SimpleCalendar
+from loguru import logger
+from tortoise import Tortoise
 
-
-from db import init_db
-from utils import States, add_user, add_calories, add_proteins, add_fats, add_carbohydrates, food_for_user, \
-    food_cathegory_name, is_user_not_empty, food_by_user, cal_by_user, \
-    get_user_from_db, prot_by_user, fats_by_user, carb_by_user, clear_food_from_db
-from messages import MESSAGES
 from conf import BOT_TOKEN
+
+from messages import MESSAGES
+from models.food import Food
+from models.food_category import FoodCategory
+from models.user import User
+
+from utils import States
 
 # BOT
 bot = Bot(token=BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MemoryStorage())
-init_db()
 logging.basicConfig(level=logging.INFO)
 
 
@@ -40,21 +45,28 @@ start_kb.row('Календарь')
 
 
 @dp.message_handler(state='*', commands=['start'])
-async def start_command(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_user(message.from_user.id)
+async def start_command(message: types.Message, state: FSMContext):
+    await User.add_user(message.from_user.id)
     message = await message.answer(MESSAGES['start'], reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.START)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.START.set()
+
+
+@dp.callback_query_handler(state='*', text_contains='Cancel')
+async def cancel_button(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.delete_message(callback_query.from_user.id, callback_query.message.message_id)
+    await States.WAIT.set()
 
 
 @dp.message_handler(state='*', commands=['change_limits'])
-async def change_limit(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_user(message.from_user.id)
+async def change_limit(message: types.Message, state: FSMContext):
+    await User.add_user(message.from_user.id)
     message = await message.answer('Сколько каллорий в день можно употреблять? (Напиши просто цифру)', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.START)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.START.set()
 
 
 @dp.message_handler(commands=['help'])
@@ -62,198 +74,235 @@ async def help_command(message: types.Message):
     await message.reply(MESSAGES['help'])
 
 
-@dp.callback_query_handler(state='*', text_contains='Cancel')
-async def cancel_button(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.delete_message(callback_query.from_user.id, callback_query.message.message_id)
-    state = dp.current_state(user=callback_query.from_user.id)
-    await state.set_state(States.WAIT)
-
-
-@dp.message_handler(lambda message: message.text.isdigit(), state=States.START, content_types=ContentType.TEXT)
-async def add_colories_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_calories(message.from_user.id, message.text)
-    data = await state.get_data()
-    await bot.edit_message_text('Калорий в день: {}'.format(message.text), data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+@dp.message_handler(lambda message: message.text.isdigit(),
+                    state=States.START,
+                    content_types=ContentType.TEXT)
+async def add_colories_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        await bot.edit_message_text(
+            'Калорий в день: {}'.format(message.text),
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
+        data['calories'] = message.text
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько белков в день?', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.PROT)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.PROT.set()
 
 
-@dp.message_handler(lambda message: message.text.isdigit(), state=States.PROT, content_types=ContentType.TEXT)
-async def add_proteins_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_proteins(message.from_user.id, message.text)
-    data = await state.get_data()
-    await bot.edit_message_text('Белков в день: {}'.format(message.text), data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
+                    state=States.PROT,
+                    content_types=ContentType.TEXT)
+async def add_proteins_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        await bot.edit_message_text(
+            'Белков в день: {}'.format(message.text),
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
+        data['proteins'] = message.text
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько жиров в день?', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FATS)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FATS.set()
 
 
-@dp.message_handler(lambda message: message.text.isdigit(), state=States.FATS, content_types=ContentType.TEXT)
-async def add_fats_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_fats(message.from_user.id, message.text)
-    data = await state.get_data()
-    await bot.edit_message_text('Жиров в день: {}'.format(message.text), data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
+                    state=States.FATS,
+                    content_types=ContentType.TEXT)
+async def add_fats_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        await bot.edit_message_text(
+            'Жиров в день: {}'.format(message.text),
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
+        data['fats'] = message.text
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько углеводов в день?', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.CARB)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.CARB.set()
 
 
-@dp.message_handler(lambda message: message.text.isdigit(), state=States.CARB, content_types=ContentType.TEXT)
-async def add_carbohydrates_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    add_carbohydrates(message.from_user.id, message.text)
-    data = await state.get_data()
-    await bot.edit_message_text('Углеводов в день: {}'.format(message.text), data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+@dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
+                    state=States.CARB,
+                    content_types=ContentType.TEXT)
+async def add_carbohydrates_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        await bot.edit_message_text(
+            'Углеводов в день: {}'.format(message.text),
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
+        data['carbohydrates'] = message.text
+        await User.add_info(message.from_user.id, data)
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Сохранено')
-    await state.set_state(States.WAIT)
+    async with state.proxy() as data:
+        data.pop('message', None)
+    await States.WAIT.set()
 
 
 @dp.message_handler(state='*', commands=['add_food'])
 async def add_food_state(message: types.Message):
-    if is_user_not_empty(message.from_user.id):
-        state = dp.current_state(user=message.from_user.id)
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
         await message.answer('Добавляем блюдо! Какой это прием пищи?', reply_markup=inline_kb1)
-        await state.set_state(States.FOOD_NAME)
+        await States.FOOD_NAME.set()
     else:
         await start_command(message)
 
 
 @dp.callback_query_handler(state=States.FOOD_NAME)
-async def add_food_name_state(callback_query: types.CallbackQuery):
-    message = await bot.send_message(callback_query.from_user.id, 'Название блюда:', reply_markup=cancel_kb)
-    await bot.edit_message_text(food_cathegory_name(callback_query.data) + ':', callback_query.from_user.id,
-                                callback_query.message.message_id)
-    state = dp.current_state(user=callback_query.from_user.id)
-    await state.update_data(category=callback_query.data)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_WEIGHT)
+async def add_food_name_state(callback_query: types.CallbackQuery, state: FSMContext):
+    message = await bot.send_message(callback_query.from_user.id,
+                                     'Название блюда:', reply_markup=cancel_kb)
+    async with state.proxy() as data:
+        data['message'] = message
+        data['category'] = callback_query.data
+        category = await FoodCategory.get_food_cathegory(callback_query.data)
+        await bot.edit_message_text(
+            category.name + ':',
+            callback_query.from_user.id,
+            callback_query.message.message_id
+        )
+
+    await States.FOOD_WEIGHT.set()
 
 
 @dp.message_handler(state=States.FOOD_WEIGHT, content_types=ContentType.TEXT)
-async def add_food_weight_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    await state.update_data(name=message.text)
-    data = await state.get_data()
-    await bot.edit_message_text(message.text, data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+async def add_food_weight_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+        await bot.edit_message_text(
+            message.text,
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько грамм в порции: (0, если не знаешь сколько)', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_CAL)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FOOD_CAL.set()
 
 
 @dp.message_handler(lambda message: message.text.isdigit(),
                     state=States.FOOD_CAL, content_types=ContentType.TEXT)
-async def add_food_cal_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    await state.update_data(weight=message.text)
-    data = await state.get_data()
-    await bot.edit_message_text(message.text + ' грамм', data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+async def add_food_cal_state(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['weight'] = message.text
+        await bot.edit_message_text(
+            message.text + ' грамм', data.get('message').chat.id,
+            data.get('message').message_id
+        )
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько каллорий в порции:', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_PROT)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FOOD_PROT.set()
 
 
 @dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_PROT, content_types=ContentType.TEXT)
-async def add_food_prot_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
+async def add_food_prot_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
-    await state.update_data(calories=message_text)
-    data = await state.get_data()
-    await bot.edit_message_text(message_text + ' ккал', data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+    async with state.proxy() as data:
+        data['calories'] = message.text
+        await bot.edit_message_text(
+            message_text + ' ккал', data.get('message').chat.id,
+            data.get('message').message_id
+        )
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько белков в порции:', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_FATS)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FOOD_FATS.set()
 
 
 @dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_FATS, content_types=ContentType.TEXT)
-async def add_food_fats_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
+async def add_food_fats_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
-    await state.update_data(proteins=message_text)
-    data = await state.get_data()
-    await bot.edit_message_text(message_text + ' белки', data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+    async with state.proxy() as data:
+        data['proteins'] = message.text
+        await bot.edit_message_text(
+            message_text + ' белки', data.get('message').chat.id,
+            data.get('message').message_id
+        )
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько жиров в порции:', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_CARB)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FOOD_CARB.set()
 
 
 @dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_CARB, content_types=ContentType.TEXT)
-async def add_food_carb_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
+async def add_food_carb_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
-    await state.update_data(fats=message_text)
-    data = await state.get_data()
-    await bot.edit_message_text(message_text + ' жиры', data.get('last_message').chat.id,
-                                data.get('last_message').message_id)
+    async with state.proxy() as data:
+        data['fats'] = message.text
+        await bot.edit_message_text(
+            message_text + ' жиры',
+            data.get('message').chat.id,
+            data.get('message').message_id
+        )
     await bot.delete_message(message.from_user.id, message.message_id)
     message = await message.answer('Сколько углеводов в порции:', reply_markup=cancel_kb)
-    await state.update_data(last_message=message)
-    await state.set_state(States.FOOD_SAVE)
+    async with state.proxy() as data:
+        data['message'] = message
+    await States.FOOD_SAVE.set()
 
 
 @dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
                     state=States.FOOD_SAVE, content_types=ContentType.TEXT)
-async def add_food_save_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
+async def add_food_save_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
-    await state.update_data(carbohydrates=message_text)
-    food_data = await state.get_data()
-    await bot.edit_message_text(message_text + ' углеводы', food_data.get('last_message').chat.id,
-                                food_data.get('last_message').message_id)
-    food_for_user(message.from_user.id,
-                  food_data.get('category'),
-                  food_data.get('name'),
-                  food_data.get('calories'),
-                  food_data.get('weight'),
-                  food_data.get('proteins'),
-                  food_data.get('fats'),
-                  food_data.get('carbohydrates'),
-                  )
+    async with state.proxy() as food_data:
+        food_data['carbohydrates'] = message.text
+
+        await bot.edit_message_text(
+            message_text + ' углеводы',
+            food_data.get('message').chat.id,
+            food_data.get('message').message_id
+        )
+        user = await User.filter(chat_id=message.from_user.id).get()
+        await Food.add_food_for_user(
+            user,
+            food_data.get('category'),
+            food_data.get('name'),
+            food_data.get('calories'),
+            food_data.get('weight'),
+            food_data.get('proteins'),
+            food_data.get('fats'),
+            food_data.get('carbohydrates'),
+        )
 
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Блюдо сохранено!')
-    await state.set_state(States.WAIT)
+    await States.WAIT.set()
 
 
 @dp.message_handler(state='*', commands=['today_food'])
 async def today_food_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    food = food_by_user(message.from_user.id)
+    food = await User.get_food_by_user(message.from_user.id)
 
-    if food and food.exists():
-        user = get_user_from_db(message.from_user.id)
-        cal = cal_by_user(message.from_user.id)
-        prot = prot_by_user(message.from_user.id)
-        fats = fats_by_user(message.from_user.id)
-        carb = carb_by_user(message.from_user.id)
+    if food:
+        user = await User.get(chat_id=message.from_user.id)
+        calories = await User.get_calories_by_user(user)
+        proteins = await User.get_proteins_by_user(user)
+        fats = await User.get_fats_by_user(user)
+        carbohydrates = await User.get_carbohydrates_by_user(user)
 
         message_str = ''
         for i in food:
+            category = await i.category.first()
             message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
-                i.category.name,
+                category.name,
                 i.time.strftime("%H:%M"),
                 i.name,
                 i.weight,
@@ -263,30 +312,29 @@ async def today_food_state(message: types.Message):
                 i.carbohydrates
             )
 
-        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(cal, user.calories - cal)
-        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(prot, user.proteins - prot)
+        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
+        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
         message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carb, user.carbohydrates - carb)
+        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
     else:
         message_str = 'Не найдено информации'
 
     await message.answer(message_str, parse_mode='Markdown')
-    await state.set_state(States.WAIT)
+    await States.WAIT.set()
 
 
 @dp.message_handler(state='*', commands=['food_for_date'])
-async def food_for_date_input(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
+async def food_for_date_input(message: types.Message, state: FSMContext):
     message = await message.answer('Выбери дату в календаре', reply_markup=start_kb)
-    await state.update_data(calendar=message)
+    async with state.proxy() as food_data:
+        food_data['calendar'] = message
 
 
 @dp.message_handler(Text(equals=['Календарь']), state='*')
-async def nav_cal_handler(message: Message):
+async def nav_cal_handler(message: Message, state: FSMContext):
     await message.answer("Выбери дату: ", reply_markup=await SimpleCalendar().start_calendar())
-    state = dp.current_state(user=message.from_user.id)
-    data = await state.get_data()
-    await bot.delete_message(data.get('calendar').chat.id, data.get('calendar').message_id)
+    async with state.proxy() as data:
+        await bot.delete_message(data.get('calendar').chat.id, data.get('calendar').message_id)
 
 
 @dp.callback_query_handler(simple_cal_callback.filter(), state='*')
@@ -296,9 +344,8 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
         await callback_query.message.answer(
             f'{date.strftime("%Y-%m-%d")}'
         )
-        state = dp.current_state(user=callback_query.message.from_user.id)
         await bot.edit_message_text('Вы выбрали:', callback_query.message.chat.id, callback_query.message.message_id)
-        await state.set_state(States.FOOD_DATE)
+        await States.FOOD_DATE.set()
         callback_query.message.text = date.strftime("%Y-%m-%d")
         await food_for_date_state(callback_query.message)
 
@@ -306,21 +353,20 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
 @dp.callback_query_handler(simple_cal_callback.filter())
 @dp.message_handler(state=States.FOOD_DATE, content_types=ContentType.TEXT)
 async def food_for_date_state(message: types.Message):
-    state = dp.current_state(user=message.from_user.id)
-    user = message.chat.id
-    food = food_by_user(message.chat.id, message.text)
+    food = await User.get_food_by_user(message.chat.id, message.text)
 
-    if food and food.exists():
-        user = get_user_from_db(user)
-        cal = cal_by_user(user, message.text)
-        prot = prot_by_user(user, message.text)
-        fats = fats_by_user(user, message.text)
-        carb = carb_by_user(user, message.text)
+    if food:
+        user = await User.get(chat_id=message.chat.id)
+        calories = await User.get_calories_by_user(user, message.text)
+        proteins = await User.get_proteins_by_user(user, message.text)
+        fats = await User.get_fats_by_user(user, message.text)
+        carbohydrates = await User.get_carbohydrates_by_user(user, message.text)
 
         message_str = ''
         for i in food:
-            message_str += '*{} ({})*\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
-                i.category.name,
+            category = await i.category.first()
+            message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
+                category.name,
                 i.time.strftime("%H:%M"),
                 i.name,
                 i.weight,
@@ -330,20 +376,20 @@ async def food_for_date_state(message: types.Message):
                 i.carbohydrates
             )
 
-        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(cal, user.calories - cal)
-        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(prot, user.proteins - prot)
+        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
+        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
         message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carb, user.carbohydrates - carb)
+        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
     else:
         message_str = 'Не найдено информации'
 
-    await message.answer(message_str, parse_mode='Markdown', reply_markup=None)
-    await state.set_state(States.WAIT)
+    await message.answer(message_str, parse_mode='Markdown')
+    await States.WAIT.set()
 
 
 @dp.message_handler(state='*', commands=['my_limits'])
 async def my_limit(message: types.Message):
-    user = get_user_from_db(message.from_user.id)
+    user = await User.get(chat_id=message.from_user.id)
     msg = '*Лимиты*:\n'
     msg += 'калории: {}\n'.format(user.calories)
     msg += 'белки: {}\n'.format(user.proteins)
@@ -355,7 +401,10 @@ async def my_limit(message: types.Message):
 
 @dp.message_handler(state='*', commands=['clear'])
 async def clear(message: types.Message):
-    await message.answer(clear_food_from_db(message.from_user.id), parse_mode='Markdown')
+    user = await User.get(chat_id=message.from_user.id)
+    await User.delete_today(user)
+    await message.answer('Таблица очищена', parse_mode='Markdown')
+
 
 
 async def shutdown(dispatcher: Dispatcher):
@@ -363,5 +412,16 @@ async def shutdown(dispatcher: Dispatcher):
     await dispatcher.storage.wait_closed()
 
 
+async def database_init():
+    await Tortoise.init(
+        db_url='sqlite://db.sqlite3',
+        modules={'models': ['models.user', 'models.food', 'models.food_category']}
+    )
+    await Tortoise.generate_schemas()
+    logger.info("Tortoise inited!")
+
+
 def start_polling():
-    executor.start_polling(dp, on_shutdown=shutdown)
+    loop = asyncio.get_event_loop()
+    loop.create_task(database_init())
+    executor.start_polling(dp, on_shutdown=shutdown, skip_updates=True)

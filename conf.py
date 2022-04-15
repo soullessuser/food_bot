@@ -1,3 +1,3 @@
 BOT_TOKEN = '5253741270:AAEropgA0BF1gDuFYiQmBe-xpsy_Hw6LCik'
 # BOT_TOKEN = '5021472423:AAH_ttxmVX-tqMQTB63P_4IMs4fxG-gznFw'
-DB = 'food.db'
+DB = 'food'

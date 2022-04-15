@@ -13,3 +13,6 @@ peewee==3.14.10
 pytz==2022.1
 yarl==1.7.2
 aiogram_calendar
+tortoise-orm
+asyncpg
+loguru
