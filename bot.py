@@ -26,13 +26,13 @@ bot = Bot(token=BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MemoryStorage())
 logging.basicConfig(level=logging.INFO)
 
-
 inline_btn_1 = InlineKeyboardButton('Завтрак', callback_data='1')
 inline_btn_2 = InlineKeyboardButton('Обед', callback_data='2')
 inline_btn_3 = InlineKeyboardButton('Ужин', callback_data='3')
 inline_btn_4 = InlineKeyboardButton('Перекус', callback_data='4')
 inline_btn_cancel = InlineKeyboardButton('Отмена', callback_data='Cancel')
-inline_kb1 = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_1, inline_btn_2, inline_btn_3, inline_btn_4, inline_btn_cancel)
+inline_kb1 = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_1, inline_btn_2, inline_btn_3, inline_btn_4,
+                                                            inline_btn_cancel)
 
 inline_btn_5 = InlineKeyboardButton('Добавить граммы и каллориии', callback_data='5')
 inline_btn_6 = InlineKeyboardButton('Добавить граммы, каллориии и БЖУ', callback_data='6')
@@ -40,7 +40,7 @@ inline_btn_6 = InlineKeyboardButton('Добавить граммы, каллор
 inline_kb2 = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_5, inline_btn_6, inline_btn_cancel)
 cancel_kb = InlineKeyboardMarkup(resize_keyboard=True).add(inline_btn_cancel)
 
-start_kb = ReplyKeyboardMarkup(resize_keyboard=True,)
+start_kb = ReplyKeyboardMarkup(resize_keyboard=True, )
 start_kb.row('Календарь')
 
 
@@ -63,7 +63,8 @@ async def cancel_button(callback_query: types.CallbackQuery):
 @dp.message_handler(state='*', commands=['change_limits'])
 async def change_limit(message: types.Message, state: FSMContext):
     await User.add_user(message.from_user.id)
-    message = await message.answer('Сколько каллорий в день можно употреблять? (Напиши просто цифру)', reply_markup=cancel_kb)
+    message = await message.answer('Сколько каллорий в день можно употреблять? (Напиши просто цифру)',
+                                   reply_markup=cancel_kb)
     async with state.proxy() as data:
         data['message'] = message
     await States.START.set()
@@ -148,13 +149,13 @@ async def add_carbohydrates_state(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(state='*', commands=['add_food'])
-async def add_food_state(message: types.Message):
+async def add_food_state(message: types.Message, state):
     user_exist = await User.is_user_not_empty(message.from_user.id)
     if user_exist:
         await message.answer('Добавляем блюдо! Какой это прием пищи?', reply_markup=inline_kb1)
         await States.FOOD_NAME.set()
     else:
-        await start_command(message)
+        await start_command(message, state)
 
 
 @dp.callback_query_handler(state=States.FOOD_NAME)
@@ -288,46 +289,54 @@ async def add_food_save_state(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(state='*', commands=['today_food'])
-async def today_food_state(message: types.Message):
-    food = await User.get_food_by_user(message.from_user.id)
+async def today_food_state(message: types.Message, state: FSMContext):
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
+        food = await User.get_food_by_user(message.from_user.id)
 
-    if food:
-        user = await User.get(chat_id=message.from_user.id)
-        calories = await User.get_calories_by_user(user)
-        proteins = await User.get_proteins_by_user(user)
-        fats = await User.get_fats_by_user(user)
-        carbohydrates = await User.get_carbohydrates_by_user(user)
+        if food:
+            user = await User.get(chat_id=message.from_user.id)
+            calories = await User.get_calories_by_user(user)
+            proteins = await User.get_proteins_by_user(user)
+            fats = await User.get_fats_by_user(user)
+            carbohydrates = await User.get_carbohydrates_by_user(user)
 
-        message_str = ''
-        for i in food:
-            category = await i.category.first()
-            message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
-                category.name,
-                i.time.strftime("%H:%M"),
-                i.name,
-                i.weight,
-                i.calories,
-                i.proteins,
-                i.fats,
-                i.carbohydrates
-            )
+            message_str = ''
+            for i in food:
+                category = await i.category.first()
+                message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
+                    category.name,
+                    i.time.strftime("%H:%M"),
+                    i.name,
+                    i.weight,
+                    i.calories,
+                    i.proteins,
+                    i.fats,
+                    i.carbohydrates
+                )
 
-        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
-        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
-        message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
+            message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
+            message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
+            message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
+            message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
+        else:
+            message_str = 'Не найдено информации'
+
+        await message.answer(message_str, parse_mode='Markdown')
+        await States.WAIT.set()
     else:
-        message_str = 'Не найдено информации'
-
-    await message.answer(message_str, parse_mode='Markdown')
-    await States.WAIT.set()
+        await start_command(message, state)
 
 
 @dp.message_handler(state='*', commands=['food_for_date'])
 async def food_for_date_input(message: types.Message, state: FSMContext):
-    message = await message.answer('Выбери дату в календаре', reply_markup=start_kb)
-    async with state.proxy() as food_data:
-        food_data['calendar'] = message
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
+        message = await message.answer('Выбери дату в календаре', reply_markup=start_kb)
+        async with state.proxy() as food_data:
+            food_data['calendar'] = message
+    else:
+        await start_command(message, state)
 
 
 @dp.message_handler(Text(equals=['Календарь']), state='*')
@@ -352,59 +361,66 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
 
 @dp.callback_query_handler(simple_cal_callback.filter())
 @dp.message_handler(state=States.FOOD_DATE, content_types=ContentType.TEXT)
-async def food_for_date_state(message: types.Message):
-    food = await User.get_food_by_user(message.chat.id, message.text)
+async def food_for_date_state(message: types.Message, state: FSMContext):
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
+        food = await User.get_food_by_user(message.chat.id, message.text)
 
-    if food:
-        user = await User.get(chat_id=message.chat.id)
-        calories = await User.get_calories_by_user(user, message.text)
-        proteins = await User.get_proteins_by_user(user, message.text)
-        fats = await User.get_fats_by_user(user, message.text)
-        carbohydrates = await User.get_carbohydrates_by_user(user, message.text)
+        if food:
+            user = await User.get(chat_id=message.chat.id)
+            calories = await User.get_calories_by_user(user, message.text)
+            proteins = await User.get_proteins_by_user(user, message.text)
+            fats = await User.get_fats_by_user(user, message.text)
+            carbohydrates = await User.get_carbohydrates_by_user(user, message.text)
 
-        message_str = ''
-        for i in food:
-            category = await i.category.first()
-            message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
-                category.name,
-                i.time.strftime("%H:%M"),
-                i.name,
-                i.weight,
-                i.calories,
-                i.proteins,
-                i.fats,
-                i.carbohydrates
-            )
+            message_str = ''
+            for i in food:
+                category = await i.category.first()
+                message_str += '*{}* ({})\n_блюдо: {}\nвес: {} грамм\nкалорийность: {} ккал\nБ/Ж/У: {}/{}/{}_\n\n'.format(
+                    category.name,
+                    i.time.strftime("%H:%M"),
+                    i.name,
+                    i.weight,
+                    i.calories,
+                    i.proteins,
+                    i.fats,
+                    i.carbohydrates
+                )
 
-        message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
-        message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
-        message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
-        message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
+            message_str += 'Калорий (съедено/осталось): {:.1f}/{:.1f}\n'.format(calories, user.calories - calories)
+            message_str += 'Белки: {:.1f}/{:.1f}\n'.format(proteins, user.proteins - proteins)
+            message_str += 'Жиры: {:.1f}/{:.1f}\n'.format(fats, user.fats - fats)
+            message_str += 'Углеводы: {:.1f}/{:.1f}\n'.format(carbohydrates, user.carbohydrates - carbohydrates)
+        else:
+            message_str = 'Не найдено информации'
+
+        await message.answer(message_str, parse_mode='Markdown')
+        await States.WAIT.set()
     else:
-        message_str = 'Не найдено информации'
-
-    await message.answer(message_str, parse_mode='Markdown')
-    await States.WAIT.set()
+        await start_command(message, state)
 
 
 @dp.message_handler(state='*', commands=['my_limits'])
 async def my_limit(message: types.Message):
-    user = await User.get(chat_id=message.from_user.id)
-    msg = '*Лимиты*:\n'
-    msg += 'калории: {}\n'.format(user.calories)
-    msg += 'белки: {}\n'.format(user.proteins)
-    msg += 'жиры: {}\n'.format(user.fats)
-    msg += 'углеводы: {}\n'.format(user.carbohydrates)
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
+        user = await User.get(chat_id=message.from_user.id)
+        msg = '*Лимиты*:\n'
+        msg += 'калории: {}\n'.format(user.calories)
+        msg += 'белки: {}\n'.format(user.proteins)
+        msg += 'жиры: {}\n'.format(user.fats)
+        msg += 'углеводы: {}\n'.format(user.carbohydrates)
 
-    await message.answer(msg, parse_mode='Markdown')
+        await message.answer(msg, parse_mode='Markdown')
 
 
 @dp.message_handler(state='*', commands=['clear'])
 async def clear(message: types.Message):
-    user = await User.get(chat_id=message.from_user.id)
-    await User.delete_today(user)
-    await message.answer('Таблица очищена', parse_mode='Markdown')
-
+    user_exist = await User.is_user_not_empty(message.from_user.id)
+    if user_exist:
+        user = await User.get(chat_id=message.from_user.id)
+        await User.delete_today(user)
+        await message.answer('Таблица очищена', parse_mode='Markdown')
 
 
 async def shutdown(dispatcher: Dispatcher):
