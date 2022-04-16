@@ -362,7 +362,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
 @dp.callback_query_handler(simple_cal_callback.filter())
 @dp.message_handler(state=States.FOOD_DATE, content_types=ContentType.TEXT)
 async def food_for_date_state(message: types.Message, state: FSMContext):
-    user_exist = await User.is_user_not_empty(message.from_user.id)
+    user_exist = await User.is_user_not_empty(message.chat.id)
     if user_exist:
         food = await User.get_food_by_user(message.chat.id, message.text)
 
