@@ -347,7 +347,7 @@ async def nav_cal_handler(message: Message, state: FSMContext):
 
 
 @dp.callback_query_handler(simple_cal_callback.filter(), state='*')
-async def process_simple_calendar(callback_query: CallbackQuery, callback_data: CallbackQuery()):
+async def process_simple_calendar(callback_query: CallbackQuery, callback_data: CallbackQuery(), state: FSMContext):
     selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
     if selected:
         await callback_query.message.answer(
@@ -356,7 +356,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
         await bot.edit_message_text('Вы выбрали:', callback_query.message.chat.id, callback_query.message.message_id)
         await States.FOOD_DATE.set()
         callback_query.message.text = date.strftime("%Y-%m-%d")
-        await food_for_date_state(callback_query.message)
+        await food_for_date_state(callback_query.message, state)
 
 
 @dp.callback_query_handler(simple_cal_callback.filter())
