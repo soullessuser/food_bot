@@ -212,7 +212,7 @@ async def way_first_handler(callback_query: types.CallbackQuery, state: FSMConte
 async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
     async with state.proxy() as food_data:
-        food_data['calories'] = message.text
+        food_data['calories'] = message.text.replace(',', '.')
         await bot.edit_message_text(
             message_text + ' ккал', food_data.get('message').chat.id,
             food_data.get('message').message_id
@@ -256,7 +256,7 @@ async def way_second_handler(callback_query: types.CallbackQuery, state: FSMCont
 async def add_food_cal_lite_second_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
     async with state.proxy() as food_data:
-        food_data['calories'] = message.text
+        food_data['calories'] = message_text
         await bot.edit_message_text(
             message_text + ' ккал', food_data.get('message').chat.id,
             food_data.get('message').message_id
@@ -272,7 +272,7 @@ async def add_food_cal_lite_second_state(message: types.Message, state: FSMConte
 async def add_food_cal_lite_second_save_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
     async with state.proxy() as food_data:
-        food_data['weight'] = message.text
+        food_data['weight'] = message_text
         w = int(food_data.get('weight', 0)) / 100
         await bot.edit_message_text(
             message_text + ' г', food_data.get('message').chat.id,
@@ -300,7 +300,7 @@ async def add_food_cal_lite_second_save_state(message: types.Message, state: FSM
 async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
     message_text = message.text.replace(',', '.')
     async with state.proxy() as food_data:
-        food_data['calories'] = message.text
+        food_data['calories'] = message_text
         await bot.edit_message_text(
             message_text + ' ккал', food_data.get('message').chat.id,
             food_data.get('message').message_id
