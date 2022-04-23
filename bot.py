@@ -1,5 +1,6 @@
 #!venv/bin/python
 import asyncio
+import json
 import logging
 
 from aiogram import Bot, Dispatcher, executor, types
@@ -218,7 +219,9 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
             food_data.get('message').message_id
         )
         user = await User.filter(chat_id=message.from_user.id).get()
-        logger.info(food_data, user)
+        data = food_data.as_dict()
+        del data['message']
+        logger.info(f'{data}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -280,7 +283,9 @@ async def add_food_cal_lite_second_save_state(message: types.Message, state: FSM
             food_data.get('message').message_id
         )
         user = await User.filter(chat_id=message.from_user.id).get()
-        logger.info(food_data, user)
+        data = food_data.as_dict()
+        del data['message']
+        logger.info(f'{data}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -308,7 +313,9 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
             food_data.get('message').message_id
         )
         user = await User.filter(chat_id=message.from_user.id).get()
-        logger.info(food_data, user)
+        data = food_data.as_dict()
+        del data['message']
+        logger.info(f'{data}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -449,7 +456,9 @@ async def add_food_save_state(message: types.Message, state: FSMContext):
             food_data.get('message').message_id
         )
         user = await User.filter(chat_id=message.from_user.id).get()
-        logger.info(food_data, user)
+        data = food_data.as_dict()
+        del data['message']
+        logger.info(f'{data}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
