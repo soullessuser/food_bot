@@ -54,10 +54,10 @@ async def start_command(message: types.Message, state: FSMContext):
 
 
 @dp.callback_query_handler(state='*', text_contains='Cancel')
-async def cancel_button(callback_query: types.CallbackQuery):
+async def cancel_button(callback_query: types.CallbackQuery, state: FSMContext):
     await bot.answer_callback_query(callback_query.id)
     await bot.delete_message(callback_query.from_user.id, callback_query.message.message_id)
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.message_handler(state='*', commands=['change_limits'])
@@ -145,7 +145,7 @@ async def add_carbohydrates_state(message: types.Message, state: FSMContext):
     await message.answer('Сохранено')
     async with state.proxy() as data:
         data.pop('message', None)
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.message_handler(state='*', commands=['add_food_lite'])
@@ -218,6 +218,7 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
             food_data.get('message').message_id
         )
         user = await User.filter(chat_id=message.from_user.id).get()
+        print(food_data, user)
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -231,7 +232,7 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
 
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Блюдо сохранено!')
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.callback_query_handler(text_contains='second', state='*')
@@ -292,7 +293,7 @@ async def add_food_cal_lite_second_save_state(message: types.Message, state: FSM
 
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Блюдо сохранено!')
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.message_handler(lambda message: message.text.replace('.', '').replace(',', '').isdigit(),
@@ -319,7 +320,7 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
 
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Блюдо сохранено!')
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.message_handler(state='*', commands=['add_food'])
@@ -459,7 +460,7 @@ async def add_food_save_state(message: types.Message, state: FSMContext):
 
     await bot.delete_message(message.from_user.id, message.message_id)
     await message.answer('Блюдо сохранено!')
-    await States.WAIT.set()
+    await state.finish()
 
 
 @dp.message_handler(state='*', commands=['today_food'])
@@ -497,7 +498,7 @@ async def today_food_state(message: types.Message, state: FSMContext):
             message_str = 'Не найдено информации'
 
         await message.answer(message_str, parse_mode='Markdown')
-        await States.WAIT.set()
+        await state.finish()
     else:
         await start_command(message, state)
 
@@ -569,7 +570,7 @@ async def food_for_date_state(message: types.Message, state: FSMContext):
             message_str = 'Не найдено информации'
 
         await message.answer(message_str, parse_mode='Markdown')
-        await States.WAIT.set()
+        await state.finish()
     else:
         await start_command(message, state)
 
