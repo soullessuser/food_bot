@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from loguru import logger
 from tortoise import fields
 
 from . import AbstractBaseModel
@@ -21,7 +22,8 @@ class Food(AbstractBaseModel):
         @staticmethod
         async def add_food_for_user(user, category, name, calories, weight, proteins, fats, carbohydrates,
                                     date=datetime.now().date()):
-            await Food.create(
+            try:
+                await Food.create(
                     user=user,
                     category_id=int(category),
                     name=name,
@@ -32,4 +34,6 @@ class Food(AbstractBaseModel):
                     carbohydrates=float(carbohydrates),
                     date=date,
                     time=datetime.now().time()
-            )
+                )
+            except Exception as e:
+                logger.error(f'{e}')

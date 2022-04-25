@@ -11,7 +11,7 @@ from aiogram.types import ContentType, InlineKeyboardButton, InlineKeyboardMarku
     CallbackQuery
 from aiogram_calendar import simple_cal_callback, SimpleCalendar
 from loguru import logger
-from tortoise import Tortoise
+from tortoise import Tortoise, run_async
 
 from conf import BOT_TOKEN
 
@@ -221,7 +221,7 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
         user = await User.filter(chat_id=message.from_user.id).get()
         data = food_data.as_dict()
         del data['message']
-        logger.info(f'{data}')
+        logger.info(f'{data} {user.chat_id}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -285,7 +285,7 @@ async def add_food_cal_lite_second_save_state(message: types.Message, state: FSM
         user = await User.filter(chat_id=message.from_user.id).get()
         data = food_data.as_dict()
         del data['message']
-        logger.info(f'{data}')
+        logger.info(f'{data} {user.chat_id}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -315,7 +315,7 @@ async def add_food_cal_lite_state(message: types.Message, state: FSMContext):
         user = await User.filter(chat_id=message.from_user.id).get()
         data = food_data.as_dict()
         del data['message']
-        logger.info(f'{data}')
+        logger.info(f'{data} {user.chat_id}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -458,7 +458,7 @@ async def add_food_save_state(message: types.Message, state: FSMContext):
         user = await User.filter(chat_id=message.from_user.id).get()
         data = food_data.as_dict()
         del data['message']
-        logger.info(f'{data}')
+        logger.info(f'{data} {user.chat_id}')
         await Food.add_food_for_user(
             user,
             food_data.get('category'),
@@ -625,6 +625,5 @@ async def database_init():
 
 
 def start_polling():
-    loop = asyncio.get_event_loop()
-    loop.create_task(database_init())
+    run_async(database_init())
     executor.start_polling(dp, on_shutdown=shutdown, skip_updates=True)
